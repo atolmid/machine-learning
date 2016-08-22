@@ -22904,7 +22904,21 @@ Probability of Sample 2: [ 0.98428716  0.01571284]
 </div>
 <div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p><strong>Answer:</strong> The distributor can select a sample of a certain size (possibly 50%) out of each cluster. Each of the samples from the same cluster should have a similar behaviour. Then, the distributor can change the delivery service for the customers included in the selected sample, for a time long enough to be able to measure reactions. During this time, he will examine how positively they see this change (could be done by checking the change in money spent by the customers included in the selected sample, compared to changes in the amount of money spent by the remaining customers of the cluster - the ones that didn't have their delivery service changed). The results would be summarized separately for each cluster. If any of the cluster sample groups displayed a positive reaction to the proposed changes, the distributor could implement it for the members specific cluster. Otherwise, the delivery for all the members of the cluster should revert to the delivery service of 5 times a week.</p>
+<p><strong>Answer:</strong> The distributor can select a random sample of a certain size (usually around 50%) out of each cluster. 
+Each of the samples of the same cluster should have a similar behaviour. 
+For each cluster, 50% of the customers will belong to the Test/Experimental Group, and 50% to the Control Group. 
+Then, the distributor will select the metric that defines if the testing of the new delivery service is successfull or not. 
+This can be the money spent by the customers.</p>
+<p>After that, the delivery service will be changed for the customers included in the Experimental Group, and remain the same for the Control Group (for both clusters). 
+It will remain like this for a predefined time, long enough to be able to measure reactions.</p>
+<p>At the end, the distributor will compare the results of the Experimental Group regarding the metric set, and compare them with the goals set. 
+If the goals for the Experimental Group for either of the clusters have been met, then the distributor needs to compare the results of the Experimental Group, with those of the Control Group of therespective cluster. 
+If not, the delivery for all the members of the cluster should revert to the delivery service of 5 times a week.</p>
+<p>For each cluster there two possibilities: The performance of the Experimental Group is similar to that of the Control Group, or otherwise. 
+If these results are similar, it means that any change in the results was not caused by the change in the delivery service, but other causes. 
+Then we can revert to the old delivery service for all groups of the cluster. 
+If on the other hand the results of the Experimental group of a cluster are significantly different (better) from those of the Control Group, and the targets have been met, then the distributor can roll out the new delivery service to all members of the specific cluster. 
+Of course, if the results of the Experimental Group are worse than those of the Control Group for a cluster, then all the members of this cluster will be offered the old delivery service.</p>
 
 </div>
 </div>
