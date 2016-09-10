@@ -2,121 +2,102 @@ import random
 from environment import Agent, Environment
 from planner import RoutePlanner
 from simulator import Simulator
-import collections
+from collections import defaultdict
 import pandas as pd
 import numpy as np
 
+
 class LearningAgent(Agent):
     """An agent that learns to drive in the smartcab world."""
-
+    #create global 'actions' list
+    global actions 
+    actions = [None, 'forward', 'left', 'right']
+    #create global dictionary to store Q values
     global Q
+    #use defaultdict to initialize keys in Q, when used for the first time 
+    Q = defaultdict(dict)
 
     def __init__(self, env):
         super(LearningAgent, self).__init__(env)  # sets self.env = env, state = None, next_waypoint = None, and a default color
         self.color = 'red'  # override color
         self.planner = RoutePlanner(self.env, self)  # simple route planner to get next_waypoint
         # TODO: Initialize any additional variables here
-        #create 'actions' list
-        self.actions = [None, 'forward', 'left', 'right']
-        #initialize variables that will be used
-        #gamma should probably be affected by the deadline
-        self.gamma = None
-        self.alpha = None
-        self.epsilon = None
-        self.Q = {}
-        self.old_state = None
-        self.old_action = None
-        #self.runs = 1
-        #list to use in measuring the success rate
+        #create 'successes' list.Used to store successes as well as failures, however, as for each run the total number of routes will be 100
+        #success just stores the times the goal is reached
+        #could/should be changed to an integer instead
         self.successes = []
-
+        #initialize action and old state to None
+        self.action = None
+        self.old_state = None
+        #count the n umber of runs (used to reduce the epsilon with time)
+        #self.runs = 1
+        
+        
 
     def reset(self, destination=None):
         self.planner.route_to(destination)
-        self.runs = 1
-        self.old_state = None
-        self.old_action = None
         # TODO: Prepare for a new trip; reset any variables here, if required
-        
-    def setParameters(self, alpha, gamma, epsilon):
-        self.alpha = alpha
-        self.gamma = gamma
-        self.epsilon = epsilon
 
     def update(self, t):
         # Gather inputs
         self.next_waypoint = self.planner.next_waypoint()  # from route planner, also displayed by simulator
         inputs = self.env.sense(self)
         deadline = self.env.get_deadline(self)
-        
+
         # TODO: Update state
-        #set the state using the inputs 
-        self.state = inputs
-        #add the waypoint to the state
-        self.state['waypoint'] = str(self.next_waypoint)
-        #when apha is chosen to decay, it will be calculated as follows
-        #alpha = 1.0/(self.runs + 1)
-        
-        # TODO: Select action according to your policy
-        #if the current state is not in our Q table, set random Q values for all
-        #current state/action pairs
-        if str(self.state) not in self.Q.keys():
-            dict1 = {}
-            for act in self.actions:
-                dict1[str(act)] =  random.random() - 0.5
-            self.Q[str(self.state)] = dict1
-            
-        #random actions (for the initial part of the assignment with no Q-Learning)
-        dict1 = {}
-        for act in self.actions:
-            dict1[str(act)] =  random.random() - 0.5
-        self.Q[str(self.state)] = dict1
+        self.state = {inputs['light'], inputs['oncoming'], inputs['right'], inputs['left'], self.next_waypoint}
+        #since all the items that are None are grouped into one None, None in the state is discarted
+        self.state.discard(None)
+        #sorting the state elements, so when they are turned into string and inserted as keys into Q, we don't have the same states multiple times
+        self.state = sorted(self.state)
 
-        #using an exploration rate (epsilon) for the choice of next action
-        #epsilon will be decreasing at every run
-        #epsilon = 1.0/(2+self.runs)
-
-        #choose a random number, and if it is less than epsilon, choose a random action
-        #otherwise, choose action with the highest Q value
-        if random.random()<self.epsilon:
-            action = self.actions[int(4*random.random())]
+        #if the current state is not in Q, give all the random initial values between -0.5 and 0.5 to all actions
+        if ({str(self.state)}.issubset(Q)):
+            pass
         else:
-            action = max(self.Q[str(self.state)], key=lambda v: self.Q[str(self.state)][v])
-        #if the chosen action is None, we have to change it, since it cannot be a string
-        if action == 'None':
-            action = None
-
-        #increase the runs counter (is used for parameter - alpha, etc - decaying) 
-        self.runs += 1
-        
-        # Execute action and get reward
-        reward = self.env.act(self, action)
-        
-        # TODO: Learn policy based on state, action, reward
-        #if there is no old_state data (first run), use random Q values
-        if str(self.old_state) not in self.Q.keys():
             dict1 = {}
-            for act in self.actions:
+            for act in actions:
                 dict1[str(act)] =  random.random() - 0.5
-            self.Q[str(self.old_state)] = dict1
-                 
-        #Q-Learning: Updating Q for previous state (using epsilon)
-        #q-new = (1- alpha)*q-old + alpha*[reward + gamma * q-max]
-        self.Q[str(self.old_state)][str(self.old_action)] = self.Q[str(self.old_state)][str(self.old_action)] + self.alpha * (reward + self.gamma * (max(self.Q[str(self.state)].values())) -self.Q[str(self.old_state)][str(self.old_action)])
+            Q[str(self.state)] = dict1
+
+            
+       #choose a random number, and if it is less than epsilon, choose a random action
+        #otherwise, choose action with the highest Q value
+        if random.random()<self.epsilon or self.old_state == None:
+            self.action = actions[int(4*random.random())]
+        else:
+            act_vals = []
+            for act in actions:
+                act_vals.append(Q[str(self.state)][str(act)])
+            self.action = actions[act_vals.index(max(act_vals))]
+        #if the chosen action is None, we have to change it, since it cannot be a string
+        if self.action == 'None':
+            self.action = None
+        # Execute action and get reward
+        reward = self.env.act(self, self.action)
+
+        # TODO: Learn policy based on state, action, reward
+        #Q-Learning: Updating Q for previous state
+        #if the old state is in Q, update its values
+        if ({str(self.old_state)}.issubset(Q)) :
+            Q[str(self.old_state)][str(self.old_action)] = Q[str(self.old_state)][str(self.old_action)] + self.alpha * (reward + self.gamma * (max(Q[str(self.state)].values())) - Q[str(self.old_state)][str(self.old_action)])
+
         #The current action will be used as old action in the next update
-        self.old_action = action
+        self.old_action = self.action
         #The current state will be the old state in the next update
         self.old_state = self.state
         #print "LearningAgent.update(): deadline = {}, inputs = {}, action = {}, reward = {}".format(deadline, inputs, action, reward)  # [debug]
+        #get location and destination, compare them, and if they are equal append 1 to successes
         location = self.env.agent_states[self]["location"]
-        #print "location : ", location
         destination = self.env.agent_states[self]["destination"]
-        #print "destination : ", destination
         if location == destination:
             self.successes.append(1)
-        else:
-            self.successes.append(0)
 
+    #set the alpha, gamma and epsilon parameters
+    def setParameters(self, alpha, gamma, epsilon):
+        self.alpha = alpha
+        self.gamma = gamma
+        self.epsilon = epsilon
 
 #modified run method, so the alpha, gamma, and epsilon can be set for the agent, so 
 #testing of various parameter value combinations can be automated
@@ -136,9 +117,8 @@ def run(alpha, gamma, epsilon):
 
     sim.run(n_trials=100)  # run for a specified number of trials
     # NOTE: To quit midway, press Esc or close pygame window, or hit Ctrl+C on the command-line
-    return [a.alpha, a.gamma, a.epsilon, (100.0*a.successes.count(1)/(a.successes.count(1)+a.successes.count(0))), a.successes.count(1),  a.successes.count(0), a.successes]#, "\n"]
-    #print "number of runs :", len(a.successes) 
-    #print "number of successes :", a.successes.count(1) 
+    return [a.alpha, a.gamma, a.epsilon, a.successes.count(1)]
+
 
 if __name__ == '__main__':
     results = []
@@ -148,15 +128,13 @@ if __name__ == '__main__':
         for gamma in np.arange(0.0, 1.1, 0.1):
             for epsilon in np.arange(0.0, 0.2, 0.05):
                 for i in range(100):
-                    #sim_results = run() 
                     results.append(run(alpha, gamma, epsilon))
-    #for i in range(100): 
-        #results.append(run(0.6, 0.6, 0.1))
                     
     #turn the results array into a pandas DataFrame                
-    df_results = pd.DataFrame(results, columns = ['alpha', 'gamma', 'epsilon', 'success %', 'success', 'failure', 'success table'])
+    df_results = pd.DataFrame(results, columns = ['alpha', 'gamma', 'epsilon', 'success %'])#, 'success table'])
     print df_results
     #print the row that has the highest success rate for the smart cab
     print "row with the highest success rate : ", df_results.ix[df_results['success %'].idxmax()]
     #export the results to an excel file                
     df_results.to_excel('original_agent_results.xlsx')
+
