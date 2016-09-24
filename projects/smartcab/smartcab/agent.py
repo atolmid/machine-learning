@@ -25,25 +25,45 @@ class LearningAgent(Agent):
         #create 'successes' list.Used to store successes as well as failures, however, as for each run the total number of routes will be 100
         #success just stores the times the goal is reached
         #could/should be changed to an integer instead
+        self.success = 0
         self.successes = []
         #initialize action and old state to None
         self.action = None
         self.old_state = None
-        #count the n umber of runs (used to reduce the epsilon with time)
-        #self.runs = 1
-        
-        
+        #count the number of runs (used to reduce the epsilon with time)
+        self.runs = 0
+        self.rewards = []
+        self.totalRewards = []
+        self.rewardsPerStep = []
+        self.rewardsTable = []
+        self.moves = []
 
     def reset(self, destination=None):
         self.planner.route_to(destination)
+        #self.runs will not be reset, so that epsilon is reduced continuously while alpha and gamma and initial epsilon are the same
+        self.moves.append(self.runs)
+        self.totalRewards.append(np.sum(self.rewards))
+        if self.runs > 0:
+            self.rewardsPerStep.append(np.sum(self.rewards)/self.runs)
+        self.rewardsTable.append(self.rewards)
+        self.runs = 0
+        self.successes.append(self.success)
+        self.success = 0
+        self.rewards = []
+        
         # TODO: Prepare for a new trip; reset any variables here, if required
 
     def update(self, t):
         # Gather inputs
         self.next_waypoint = self.planner.next_waypoint()  # from route planner, also displayed by simulator
         inputs = self.env.sense(self)
-        deadline = self.env.get_deadline(self)
-
+        
+        #update runs number
+        self.runs +=1
+        
+        #adjust epsilon according to the number of runs
+        self.epsilon_adjusted = self.epsilon/self.runs
+        
         # TODO: Update state
         self.state = {inputs['light'], inputs['oncoming'], inputs['right'], inputs['left'], self.next_waypoint}
         #since all the items that are None are grouped into one None, None in the state is discarted
@@ -63,7 +83,7 @@ class LearningAgent(Agent):
             
        #choose a random number, and if it is less than epsilon, choose a random action
         #otherwise, choose action with the highest Q value
-        if random.random()<self.epsilon or self.old_state == None:
+        if random.random()<self.epsilon_adjusted or self.old_state == None:
             self.action = actions[int(4*random.random())]
         else:
             act_vals = []
@@ -75,6 +95,9 @@ class LearningAgent(Agent):
             self.action = None
         # Execute action and get reward
         reward = self.env.act(self, self.action)
+        
+        #add it to the rewards table
+        self.rewards.append(reward)
 
         # TODO: Learn policy based on state, action, reward
         #Q-Learning: Updating Q for previous state
@@ -90,8 +113,9 @@ class LearningAgent(Agent):
         #get location and destination, compare them, and if they are equal append 1 to successes
         location = self.env.agent_states[self]["location"]
         destination = self.env.agent_states[self]["destination"]
+        #deadline = self.env.agent_states[self]["deadline"]
         if location == destination:
-            self.successes.append(1)
+            self.success = 1
 
     #set the alpha, gamma and epsilon parameters
     def setParameters(self, alpha, gamma, epsilon):
@@ -117,8 +141,7 @@ def run(alpha, gamma, epsilon):
 
     sim.run(n_trials=100)  # run for a specified number of trials
     # NOTE: To quit midway, press Esc or close pygame window, or hit Ctrl+C on the command-line
-    return [a.alpha, a.gamma, a.epsilon, a.successes.count(1)]
-
+    return [a.alpha, a.gamma, a.epsilon, (np.sum(a.successes[(len(a.successes)-10):len(a.successes)]) == 10), a.successes.count(1), a.totalRewards, a.rewardsPerStep, a.rewardsTable, a.moves ]
 
 if __name__ == '__main__':
     results = []
@@ -131,10 +154,6 @@ if __name__ == '__main__':
                     results.append(run(alpha, gamma, epsilon))
                     
     #turn the results array into a pandas DataFrame                
-    df_results = pd.DataFrame(results, columns = ['alpha', 'gamma', 'epsilon', 'success %'])#, 'success table'])
-    print df_results
-    #print the row that has the highest success rate for the smart cab
-    print "row with the highest success rate : ", df_results.ix[df_results['success %'].idxmax()]
+    df_results = pd.DataFrame(results, columns = ['alpha', 'gamma', 'epsilon', 'Last 10 Runs Successful', 'successes %','sum of rewards', 'rewards per step', 'rewards', 'number of moves'])
     #export the results to an excel file                
-    df_results.to_excel('original_agent_results.xlsx')
-
+    df_results.to_excel('agent_results.xlsx')
